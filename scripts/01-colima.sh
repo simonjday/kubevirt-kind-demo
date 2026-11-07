@@ -23,6 +23,13 @@ else
   die "/dev/kvm missing. Recreate the profile: colima delete --profile ${COLIMA_PROFILE} && $0"
 fi
 
+# kind + KubeVirt exhaust the default 128 inotify instances: virt-handler panics with
+# "Failed to create an inotify watcher: too many open files". Not persisted across
+# VM restarts, so this runs on every up.sh.
+colima ssh --profile "${COLIMA_PROFILE}" -- sudo sysctl -q -w \
+  fs.inotify.max_user_instances=8192 fs.inotify.max_user_watches=1048576
+ok "inotify limits raised (instances=8192, watches=1048576)"
+
 docker context inspect "${DOCKER_CONTEXT}" >/dev/null 2>&1 \
   || die "docker context '${DOCKER_CONTEXT}' not found (colima should create it)"
 docker info --format '{{.OperatingSystem}} / {{.Architecture}} / {{.NCPU}} CPU' \

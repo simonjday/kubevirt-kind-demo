@@ -23,9 +23,17 @@ spec:
     syncOptions:
       - ServerSideApply=true            # KubeVirt/CDI CRDs exceed the client-side annotation limit
       - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
     retry:
       limit: 10
       backoff:
         duration: 15s
         factor: 2
         maxDuration: 3m
+  # cdi-operator rewrites its own CRD after install -> permanent OutOfSync without this
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      name: cdis.cdi.kubevirt.io
+      managedFieldsManagers:
+        - cdi-operator
