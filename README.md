@@ -121,16 +121,16 @@ virtctl --context kind-kubevirt-lab -n vm-demo vnc fedora --proxy-only --port 59
 
 ```bash
 virtctl --context kind-kubevirt-lab -n vm-demo port-forward vm/fedora 2222:22
-ssh -p 2222 fedora@127.0.0.1
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 2222 fedora@127.0.0.1
 ```
 
-For CirrOS, forward a different local port, e.g. `port-forward vm/cirros 2223:22`.
+For CirrOS, forward a different local port, e.g. `port-forward vm/cirros 2223:22`. The full copy-paste set, including a TigerVNC launch command, is in [docs §4.5](docs/demo-flows-explained.md#45-connecting-to-the-vms-from-mac-apps).
 
 **Browsing the objects:** Freelens or Lens → `kind-kubevirt-lab` → Custom Resources → `kubevirt.io` lists VMs and VMIs. It has no console of its own.
 
 Gotchas:
 
-- `fedora` starts **Halted**. Run `virtctl ... start fedora`, or Flow 2, before you connect.
+- `fedora` starts **Halted**. Run `virtctl --context kind-kubevirt-lab -n vm-demo start fedora`, or Flow 2, before you connect.
 - If the Fedora login is rejected, cloud-init hasn't finished its first boot yet. Wait a minute and try again.
 - CirrOS sends its output to the serial port, so its VNC screen may stay blank. Use `console`.
 - zsh doesn't allow inline `# comments` by default: a pasted line with a trailing comment passes the comment as arguments (`accepts 1 arg(s), received 5`). Strip the comments, or add `setopt interactivecomments` to `~/.zshrc`.

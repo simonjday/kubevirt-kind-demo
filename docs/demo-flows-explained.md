@@ -243,6 +243,90 @@ Deleting a VM that Git declares is the one imperative step here, and Argo CD sel
 
 (`…` = `--context kind-kubevirt-lab -n vm-demo`, with `bin/` on `PATH` for `virtctl`.)
 
+**Copy-paste commands.** Run one block per Terminal tab. Each `virtctl` command stays in the foreground while the session is open. There are no inline comments, so the blocks are safe to paste into zsh.
+
+Setup, once per tab:
+
+```bash
+cd ~/git/kubevirt-kind-demo
+export PATH="$PWD/bin:$PATH"
+```
+
+Install a VNC viewer, once:
+
+```bash
+brew install --cask tigervnc-viewer
+```
+
+Start fedora if it is still Halted, and wait for `Running` (Ctrl+C to stop watching):
+
+```bash
+virtctl --context kind-kubevirt-lab -n vm-demo start fedora
+kubectl --context kind-kubevirt-lab -n vm-demo get vmi fedora -w
+```
+
+Serial console for cirros. Log in as `cirros` / `gocubsgo`, and press `Ctrl+]` to exit:
+
+```bash
+virtctl --context kind-kubevirt-lab -n vm-demo console cirros
+```
+
+Serial console for fedora. Log in as `fedora` / `kubevirt`:
+
+```bash
+virtctl --context kind-kubevirt-lab -n vm-demo console fedora
+```
+
+VNC for fedora: TigerVNC opens automatically. Leave the VNC password blank, then log in as `fedora` / `kubevirt`:
+
+```bash
+virtctl --context kind-kubevirt-lab -n vm-demo vnc fedora
+```
+
+VNC with any other viewer app: start only the proxy, then point the viewer at `127.0.0.1:5901`:
+
+```bash
+virtctl --context kind-kubevirt-lab -n vm-demo vnc fedora --proxy-only --port 5901
+```
+
+Or launch TigerVNC yourself, in a second tab. The app was named `TigerVNC Viewer <version>.app` before TigerVNC 1.16, so use whichever name `ls /Applications | grep -i tiger` shows:
+
+```bash
+open -a TigerVNC --args 127.0.0.1:5901
+```
+
+SSH to fedora. Tab 1 holds the port-forward:
+
+```bash
+virtctl --context kind-kubevirt-lab -n vm-demo port-forward vm/fedora 2222:22
+```
+
+Tab 2 logs in with password `kubevirt`:
+
+```bash
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 2222 fedora@127.0.0.1
+```
+
+SSH to cirros, using a different local port so both can be open at once:
+
+```bash
+virtctl --context kind-kubevirt-lab -n vm-demo port-forward vm/cirros 2223:22
+```
+
+Then, in a second tab, log in with password `gocubsgo`:
+
+```bash
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 2223 cirros@127.0.0.1
+```
+
+Read-only boot log, with no login needed:
+
+```bash
+kubectl --context kind-kubevirt-lab -n vm-demo logs -f -l kubevirt.io/vm=fedora -c guest-console-log
+```
+
+`UserKnownHostsFile=/dev/null` stops "host key changed" errors. The forwarded port stays the same, but the host key changes every time a VM is rebuilt. Use it for lab VMs only.
+
 **How VNC reaches the guest:** virtctl opens a WebSocket to the `vnc` subresource on virt-api. virt-api relays it to the virt-handler on the VM's node, which connects to the VNC socket QEMU exposes inside the virt-launcher pod. Nothing is published on a node port, and access is governed by RBAC on the `virtualmachineinstances/vnc` subresource. On arm64, the screen is a virtio-gpu framebuffer that KubeVirt attaches automatically.
 
 **Why macOS Screen Sharing can't be used:** the built-in client refuses VNC servers that have no password, and KubeVirt's VNC endpoint has no password. Authentication happens at the Kubernetes API instead ([kubevirt#4207](https://github.com/kubevirt/kubevirt/issues/4207)).
