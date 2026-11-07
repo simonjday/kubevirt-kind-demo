@@ -40,7 +40,7 @@ Versions verified 2026-11-07 · Target: MacBook Pro M3, macOS 15+, zsh
 
 ## How it fits together
 
-1. **`01-colima.sh`** starts the Colima profile and **fails fast** if `/dev/kvm` is missing. You can't add nested virtualisation to an existing profile, so if the check fails, delete the profile and recreate it.
+1. **`01-colima.sh`** starts the Colima profile and **fails fast** if `/dev/kvm` is missing. You can't add nested virtualisation to an existing profile, so if the check fails, delete the profile and recreate it. It also raises `fs.inotify.max_user_instances` to 8192. At Colima's default of 128, virt-handler crash-loops with `Failed to create an inotify watcher: too many open files`. The setting doesn't survive a VM restart, so the script reapplies it on every run.
 2. **`02-cluster.sh`**: kind nodes are privileged containers, so they inherit `/dev/kvm` without `extraMounts`. The script checks every node, checks for cgroup v2 (cgroup v1 is deprecated in KubeVirt 1.9), and checks that the guest images have an arm64 variant.
 3. **`03-gitea.sh`** runs Gitea, creates `lab/kubevirt-kind-demo`, and pushes this checkout.
 4. **`04-argocd.sh`** is the only imperative step. It runs a Helm install of Argo CD and applies `gitops/bootstrap/root-app.yaml`. From then on, Git is the source of truth.
@@ -86,7 +86,7 @@ To point Argo CD at GitHub instead, run `GITOPS_REPO_URL=https://github.com/simo
 - **Memory:** Colima takes 16 GiB. If Docker Desktop is also running with a 24 GiB VM, a 32 GB Mac will swap, so quit Docker Desktop or stop its clusters while you use this lab. `00-prereqs.sh` warns you about this.
 - **No `/dev/kvm`?** (M1/M2, Docker Desktop, Podman): set `useEmulation: true` in `gitops/platform/kubevirt/kubevirt-cr.yaml`, then commit and push. Everything still works under QEMU TCG, but slowly.
 - **Fedora VM** uses an RWO local-path PVC, so it's pinned to one node: `evictionStrategy: None`, and no live migration. Live migrating it would need RWX storage, for example Longhorn or NFS.
-- **Not installed here:** Kyverno, Prometheus. If you add Kyverno, `virt-launcher` pods need exceptions. They run as non-root, but they request extra capabilities (`NET_BIND_SERVICE`, `SYS_NICE`) and device resources.
+- **Not installed here:** Kyverno, Prometheus. If you add Kyverno, `virt-launcher` pods need exceptions. They run as non-root (UID 107), but add `NET_BIND_SERVICE` and request `devices.kubevirt.io/{kvm,tun,vhost-net}` device resources.
 - **Lab credentials** (Gitea `lab/lab-gitea-pass`, Fedora `fedora/kubevirt`, Argo CD `server.insecure`) are throwaway values.
 
 ## Teardown
