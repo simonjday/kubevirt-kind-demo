@@ -14,6 +14,7 @@ This is a companion to the [main README](../README.md). Script names refer to th
 | Understand the platform pieces and how Argo CD installs them | §2 |
 | Understand the two demo VMs | §3 |
 | Set up your screen before presenting | §4 |
+| Log in to a VM from a Mac app (credentials, VNC, SSH) | §4.5 |
 | Run a specific flow and know what to say | §5 |
 | Diagnose something that went wrong | §6 |
 | Draw it on a whiteboard or slides | §7 |
@@ -225,6 +226,29 @@ kubectl --context kind-kubevirt-lab -n vm-demo delete vm fedora    # its DataVol
 
 Deleting a VM that Git declares is the one imperative step here, and Argo CD self-heal puts it straight back. That's worth pointing out to the audience. CirrOS needs no reset. For a full rebuild, run `./scripts/teardown.sh && ./scripts/up.sh` (the Colima VM is kept).
 
+### 4.5 Connecting to the VMs from Mac apps
+
+| VM | Username | Password | Source |
+|---|---|---|---|
+| `fedora` | `fedora` | `kubevirt` | cloud-init `userData` in `vm-fedora.yaml` (`password`, `chpasswd: { expire: false }`, `ssh_pwauth: true`) |
+| `cirros` | `cirros` | `gocubsgo` | Built into the CirrOS image |
+
+| Method | Mac app | Command | Works for | Notes |
+|---|---|---|---|---|
+| Serial console | Terminal | `virtctl … console <vm>` | Both, best for CirrOS | Text only. Exit with `Ctrl+]`. Also visible read-only through `kubectl logs <launcher-pod> -c guest-console-log` |
+| VNC (auto) | TigerVNC (`brew install --cask tigervnc-viewer`), Chicken, RealVNC Viewer | `virtctl … vnc <vm>` | fedora | virtctl finds the viewer in `/Applications` and launches it on a random local port |
+| VNC (manual) | Any VNC client | `virtctl … vnc <vm> --proxy-only --port 5901`, then connect to `127.0.0.1:5901` | fedora | Leaves the proxy running for whichever viewer you choose |
+| SSH | Terminal, Termius, Royal TSX | `virtctl … port-forward vm/<vm> 2222:22`, then `ssh -p 2222 <user>@127.0.0.1` | Both | Keep the port-forward running. Use a different local port per VM |
+| Browse objects | Freelens / Lens | Custom Resources → `kubevirt.io` | Both | YAML, events and launcher pods. No console |
+
+(`…` = `--context kind-kubevirt-lab -n vm-demo`, with `bin/` on `PATH` for `virtctl`.)
+
+**How VNC reaches the guest:** virtctl opens a WebSocket to the `vnc` subresource on virt-api. virt-api relays it to the virt-handler on the VM's node, which connects to the VNC socket QEMU exposes inside the virt-launcher pod. Nothing is published on a node port, and access is governed by RBAC on the `virtualmachineinstances/vnc` subresource. On arm64, the screen is a virtio-gpu framebuffer that KubeVirt attaches automatically.
+
+**Why macOS Screen Sharing can't be used:** the built-in client refuses VNC servers that have no password, and KubeVirt's VNC endpoint has no password. Authentication happens at the Kubernetes API instead ([kubevirt#4207](https://github.com/kubevirt/kubevirt/issues/4207)).
+
+**On stage:** VNC on `fedora` makes the "it's a real VM" point visually: the boot messages, then a `fedora login:` prompt. The serial console on CirrOS is quicker for the live-migration timestamp loop in Flow 3.
+
 ---
 
 ## 5. The flows, step by step
@@ -351,6 +375,11 @@ After raising it, delete the virt-handler pods to skip the CrashLoopBackOff dela
 | Importer pod `CrashLoopBackOff` / `ImagePullBackOff` | quay.io unreachable, or no arm64 variant | `docker manifest inspect quay.io/containerdisks/fedora:43 \| jq -r -f jq/image-arch.jq` |
 | Migration `Failed`: no target node | Only one worker is schedulable, or memory is short on the target | `kubectl get nodes -l kubevirt.io/schedulable=true` and `kubectl describe vmim` |
 | Argo CD apps `Unknown` / repo errors | Gitea container not running, or not on the `kind` network | `docker ps --filter name=gitea`, then `./scripts/03-gitea.sh` |
+| `virtctl vnc`: `no supported VNC app found for darwin` | No TigerVNC, Chicken or RealVNC app in `/Applications` | `brew install --cask tigervnc-viewer`, or use `--proxy-only` with any viewer |
+| Screen Sharing asks for a password and won't connect | The built-in macOS client requires VNC authentication | Use TigerVNC or RealVNC (§4.5) |
+| VNC window for cirros stays black | CirrOS writes its console to the serial port, not the framebuffer | `virtctl … console cirros` |
+| `fedora` login rejected | cloud-init still running on first boot | Wait about 1 min, then retry. `kubectl logs <launcher> -c guest-console-log` shows cloud-init progress |
+| `accepts 1 arg(s), received N` | zsh passed an inline `# comment` as arguments | Remove trailing comments, or `setopt interactivecomments` in `~/.zshrc` |
 | Everything slow, Mac swapping | Docker Desktop and Colima both running | Quit Docker Desktop, or lower `COLIMA_MEMORY_GIB` |
 
 ---
@@ -409,5 +438,6 @@ After raising it, delete the virt-handler pods to skip the CrashLoopBackOff dela
 | "What about Windows or x86 images?" | Not on this Mac. KVM requires the guest to match the host architecture (arm64 here). Windows on ARM would need its own licensing and images. On x86 clusters it's routine. |
 | "How do backups work?" | VMs are CRs plus PVCs, so Velero/OADP or CSI snapshots apply. KubeVirt even pre-annotates launcher pods with `virt-freezer` hooks for consistent guest-filesystem freezes. KubeVirt 1.9 also adds `VirtualMachineBackup` CRDs. |
 | "How are KubeVirt upgrades handled?" | Bump the version in Git. virt-operator rolls the components, then `workloadUpdateMethods: [LiveMigrate]` moves running VMs onto new launcher images with no guest restart. |
+| "How do I get a screen or shell on the VM?" | `virtctl console` (serial), `virtctl vnc` (graphics, through TigerVNC or RealVNC on a Mac), or `virtctl port-forward` plus SSH. All of them go through the Kubernetes API and RBAC, so nothing is exposed on node ports. |
 | "Does Kyverno or Pod Security get in the way?" | Launcher pods meet most baseline controls but need `NET_BIND_SERVICE` and device resources, and virt-handler is privileged. Exempt the `kubevirt` namespace and allow-list launcher pods. Kyverno isn't installed in this lab. |
 | "Production differences?" | Real bare-metal or nested-capable nodes, RWX storage (ODF/Ceph) for migration, Multus for networking, dedicated migration networks, `instancetype`/`preference` objects instead of hand-sized VMs, and monitoring via the bundled Prometheus rules. |

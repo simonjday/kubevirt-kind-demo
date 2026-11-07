@@ -83,6 +83,58 @@ In-depth walkthrough of every flow (what KubeVirt does underneath, presenter set
 
 `./scripts/status.sh` shows apps, sync waves and health, per-node `devices.kubevirt.io/kvm` allocatable, VMs and VMIs. All jq filters are in `jq/`.
 
+## Connecting to the VMs
+
+| VM | Username | Password | Best way in |
+|---|---|---|---|
+| `fedora` | `fedora` | `kubevirt` (set by cloud-init) | VNC or SSH |
+| `cirros` | `cirros` | `gocubsgo` (image default) | Serial console or SSH |
+
+The VNC connection itself has **no password**: leave it blank if the viewer asks. These are throwaway lab credentials.
+
+```bash
+cd ~/git/kubevirt-kind-demo && export PATH="$PWD/bin:$PATH"
+```
+
+**Serial console (Terminal):**
+
+```bash
+virtctl --context kind-kubevirt-lab -n vm-demo console cirros
+```
+
+Press `Ctrl+]` to exit.
+
+**Graphical console (VNC).** `virtctl vnc` launches TigerVNC, Chicken, RealVNC Viewer or `remote-viewer` automatically. macOS **Screen Sharing doesn't work**: it requires a VNC password, and KubeVirt's VNC server has none.
+
+```bash
+brew install --cask tigervnc-viewer
+virtctl --context kind-kubevirt-lab -n vm-demo vnc fedora
+```
+
+To use any other VNC app, start only the proxy, then connect the app to `127.0.0.1:5901`:
+
+```bash
+virtctl --context kind-kubevirt-lab -n vm-demo vnc fedora --proxy-only --port 5901
+```
+
+**SSH** (Terminal, Termius, Royal TSX and so on). Keep the port-forward running while you're connected:
+
+```bash
+virtctl --context kind-kubevirt-lab -n vm-demo port-forward vm/fedora 2222:22
+ssh -p 2222 fedora@127.0.0.1
+```
+
+For CirrOS, forward a different local port, e.g. `port-forward vm/cirros 2223:22`.
+
+**Browsing the objects:** Freelens or Lens → `kind-kubevirt-lab` → Custom Resources → `kubevirt.io` lists VMs and VMIs. It has no console of its own.
+
+Gotchas:
+
+- `fedora` starts **Halted**. Run `virtctl ... start fedora`, or Flow 2, before you connect.
+- If the Fedora login is rejected, cloud-init hasn't finished its first boot yet. Wait a minute and try again.
+- CirrOS sends its output to the serial port, so its VNC screen may stay blank. Use `console`.
+- zsh doesn't allow inline `# comments` by default: a pasted line with a trailing comment passes the comment as arguments (`accepts 1 arg(s), received 5`). Strip the comments, or add `setopt interactivecomments` to `~/.zshrc`.
+
 ## Caveats
 
 - **Memory:** Colima takes 16 GiB. If Docker Desktop is also running with a 24 GiB VM, a 32 GB Mac will swap, so quit Docker Desktop or stop its clusters while you use this lab. `00-prereqs.sh` warns you about this.
