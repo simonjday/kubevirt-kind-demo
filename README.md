@@ -79,6 +79,8 @@ To point Argo CD at GitHub instead, run `GITOPS_REPO_URL=https://github.com/simo
 | `flow-2-datavolume.sh` | CDI imports Fedora into a PVC (WaitForFirstConsumer), and the persistent VM boots from it with cloud-init |
 | `flow-3-live-migration.sh` | The CirrOS VM (containerDisk, so it's migratable) moves to the other worker without a restart |
 
+In-depth walkthrough of every flow (what KubeVirt does underneath, presenter setup, troubleshooting, Q&A): [`docs/demo-flows-explained.md`](docs/demo-flows-explained.md).
+
 `./scripts/status.sh` shows apps, sync waves and health, per-node `devices.kubevirt.io/kvm` allocatable, VMs and VMIs. All jq filters are in `jq/`.
 
 ## Caveats
