@@ -1,0 +1,17 @@
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: CDI
+metadata:
+  name: cdi
+spec:
+  imagePullPolicy: IfNotPresent
+  config:
+    # kind's local-path 'standard' class is WaitForFirstConsumer; CDI waits for the VM pod to schedule.
+    scratchSpaceStorageClass: standard
+    featureGates:
+      - HonorWaitForFirstConsumer
+  infra:
+    nodeSelector:
+      kubernetes.io/os: linux
+  workload:
+    nodeSelector:
+      kubernetes.io/os: linux

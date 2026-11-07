@@ -1,0 +1,68 @@
+# Persistent VM: CDI imports the Fedora cloud image from a registry into a PVC
+# (DataVolume template), then the VM boots from it. Starts Halted - demo/flow-2 starts it.
+# CDI's registry importer pulls the platform matching the importer pod (arm64 here).
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: fedora
+  labels:
+    app.kubernetes.io/part-of: kubevirt-kind-demo
+spec:
+  runStrategy: Halted
+  dataVolumeTemplates:
+    - metadata:
+        name: fedora-root
+      spec:
+        source:
+          registry:
+            url: docker://quay.io/containerdisks/fedora:43
+        storage:
+          storageClassName: standard
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 8Gi
+  template:
+    metadata:
+      labels:
+        kubevirt.io/vm: fedora
+    spec:
+      # RWO local-path volume pins the VM to one node: no live migration for this one.
+      evictionStrategy: None
+      nodeSelector:
+        lab.kubevirt/role: vm-host
+      domain:
+        cpu:
+          cores: 2
+        memory:
+          guest: 2Gi
+        devices:
+          disks:
+            - name: root
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+          interfaces:
+            - name: default
+              masquerade: {}
+      networks:
+        - name: default
+          pod: {}
+      volumes:
+        - name: root
+          dataVolume:
+            name: fedora-root
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            # Lab-only credentials for `virtctl console`. Use SSH keys via a Secret for anything real.
+            userData: |
+              #cloud-config
+              user: fedora
+              password: kubevirt
+              chpasswd: { expire: false }
+              ssh_pwauth: true
+              runcmd:
+                - echo "provisioned by CDI + cloud-init" > /etc/motd

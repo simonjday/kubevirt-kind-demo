@@ -1,0 +1,13 @@
+# Node image and name are injected by scripts/02-cluster.sh.
+# Two workers so live migration (demo/flow-3) has somewhere to go.
+# No extraMounts for /dev/kvm: kind nodes are privileged and inherit it from the Colima VM.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+  - role: worker
+    labels:
+      lab.kubevirt/role: vm-host
+  - role: worker
+    labels:
+      lab.kubevirt/role: vm-host

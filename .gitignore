@@ -1,0 +1,5 @@
+# pinned virtctl downloaded by 00-prereqs.sh
+bin/
+# runtime state
+.state/
+.DS_Store

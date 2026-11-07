@@ -1,0 +1,47 @@
+# Tiny containerDisk VM: boots in seconds with KVM, live-migratable (ephemeral disk).
+# Guest must be arm64 - the Colima VM is aarch64. 02-cluster.sh checks the manifest; by hand:
+#   docker manifest inspect quay.io/kubevirt/cirros-container-disk-demo:v1.9.0 | jq -r -f jq/image-arch.jq
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: cirros
+  labels:
+    app.kubernetes.io/part-of: kubevirt-kind-demo
+spec:
+  runStrategy: Always
+  template:
+    metadata:
+      labels:
+        kubevirt.io/vm: cirros
+    spec:
+      evictionStrategy: LiveMigrate
+      nodeSelector:
+        lab.kubevirt/role: vm-host
+      domain:
+        cpu:
+          cores: 1
+        memory:
+          guest: 256Mi
+        devices:
+          disks:
+            - name: containerdisk
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+          interfaces:
+            - name: default
+              masquerade: {}
+      networks:
+        - name: default
+          pod: {}
+      volumes:
+        - name: containerdisk
+          containerDisk:
+            image: quay.io/kubevirt/cirros-container-disk-demo:v1.9.0
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |
+              #!/bin/sh
+              echo "hello from cirros on KubeVirt" > /tmp/hello

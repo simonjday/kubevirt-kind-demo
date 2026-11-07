@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-vms
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: http://gitea:3000/lab/kubevirt-kind-demo.git   # overwritten by root app
+    targetRevision: main                                    # overwritten by root app
+    path: gitops/workloads/demo-vms
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vm-demo
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true            # KubeVirt/CDI CRDs exceed the client-side annotation limit
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+      - CreateNamespace=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 3m
+  # virtctl start/stop flips spec.runStrategy - that's an operational action, don't revert it
+  ignoreDifferences:
+    - group: kubevirt.io
+      kind: VirtualMachine
+      jsonPointers:
+        - /spec/runStrategy
