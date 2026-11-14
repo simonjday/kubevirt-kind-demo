@@ -2,6 +2,8 @@
 
 **Run real, KVM-accelerated virtual machines on Kubernetes on a MacBook. kind runs on a Colima VM with nested virtualisation, and Argo CD delivers everything from an in-lab Gitea.**
 
+📝 Write-up on Medium: [Real VMs, Real KVM, on a MacBook: KubeVirt on kind with Apple M3 Nested Virtualisation](https://medium.com/@simonjday/real-vms-real-kvm-on-a-macbook-kubevirt-on-kind-with-apple-m3-nested-virtualisation-e56631f861a0)
+
 ```bash
 git clone https://github.com/simonjday/kubevirt-kind-demo.git && cd kubevirt-kind-demo
 ./scripts/up.sh            # Colima VM -> kind -> Gitea -> Argo CD -> KubeVirt + CDI + demo VMs
