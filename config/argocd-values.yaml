@@ -6,8 +6,11 @@ notifications:
 configs:
   params:
     server.insecure: true   # lab: plain HTTP behind port-forward. Prod: TLS at ingress/gateway.
-    timeout.reconciliation: 60s
   cm:
+    # Git poll interval. Lives in argocd-cm for this chart (not configs.params).
+    # Jitter 0 = a predictable 60s for demos; prod: keep jitter to spread load, or use webhooks.
+    timeout.reconciliation: 60s
+    timeout.reconciliation.jitter: 0s
     # Argo CD dropped Application health in 1.8, so sync-waves in an app-of-apps
     # don't wait for child apps. Restoring it makes operator -> CR ordering real.
     resource.customizations.health.argoproj.io_Application: |
