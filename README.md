@@ -111,11 +111,13 @@ brew install --cask tigervnc-viewer
 virtctl --context kind-kubevirt-lab -n vm-demo vnc fedora
 ```
 
-To use any other VNC app, start only the proxy, then connect the app to `127.0.0.1:5901`:
+To use any other VNC app, start only the proxy. It opens **no window**: it prints `{"port":5901}` and waits. Connect your VNC app to `127.0.0.1:5901` **within 60 seconds**, or the proxy exits (`connection timeout: 1m0s`):
 
 ```bash
 virtctl --context kind-kubevirt-lab -n vm-demo vnc fedora --proxy-only --port 5901
 ```
+
+If nothing seems to happen, that's expected. Open the viewer and connect, or drop `--proxy-only` and let virtctl launch TigerVNC for you.
 
 **SSH** (Terminal, Termius, Royal TSX and so on). Keep the port-forward running while you're connected:
 

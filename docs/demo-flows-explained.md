@@ -238,7 +238,7 @@ Deleting a VM that Git declares is the one imperative step here, and Argo CD sel
 |---|---|---|---|---|
 | Serial console | Terminal | `virtctl … console <vm>` | Both, best for CirrOS | Text only. Exit with `Ctrl+]`. Also visible read-only through `kubectl logs <launcher-pod> -c guest-console-log` |
 | VNC (auto) | TigerVNC (`brew install --cask tigervnc-viewer`), Chicken, RealVNC Viewer | `virtctl … vnc <vm>` | fedora | virtctl finds the viewer in `/Applications` and launches it on a random local port |
-| VNC (manual) | Any VNC client | `virtctl … vnc <vm> --proxy-only --port 5901`, then connect to `127.0.0.1:5901` | fedora | Leaves the proxy running for whichever viewer you choose |
+| VNC (manual) | Any VNC client | `virtctl … vnc <vm> --proxy-only --port 5901`, then connect to `127.0.0.1:5901` | fedora | Opens no window. Prints `{"port":5901}` and waits for a viewer. Exits if nothing connects within **60 s** (`connection timeout: 1m0s`) |
 | SSH | Terminal, Termius, Royal TSX | `virtctl … port-forward vm/<vm> 2222:22`, then `ssh -p 2222 <user>@127.0.0.1` | Both | Keep the port-forward running. Use a different local port per VM |
 | Browse objects | Freelens / Lens | Custom Resources → `kubevirt.io` | Both | YAML, events and launcher pods. No console |
 
@@ -284,13 +284,13 @@ VNC for fedora: TigerVNC opens automatically. Leave the VNC password blank, then
 virtctl --context kind-kubevirt-lab -n vm-demo vnc fedora
 ```
 
-VNC with any other viewer app: start only the proxy, then point the viewer at `127.0.0.1:5901`:
+VNC with any other viewer app: start only the proxy. It opens **no window**: it prints `{"port":5901}` and waits. Point the viewer at `127.0.0.1:5901` **within 60 seconds**, or the proxy exits with `connection timeout: 1m0s` and you'll need to run it again:
 
 ```bash
 virtctl --context kind-kubevirt-lab -n vm-demo vnc fedora --proxy-only --port 5901
 ```
 
-Or launch TigerVNC yourself, in a second tab. The app was named `TigerVNC Viewer <version>.app` before TigerVNC 1.16, so use whichever name `ls /Applications | grep -i tiger` shows:
+Then, while the proxy is waiting, launch TigerVNC yourself in a second tab. The app was named `TigerVNC Viewer <version>.app` before TigerVNC 1.16, so use whichever name `ls /Applications | grep -i tiger` shows:
 
 ```bash
 open -a TigerVNC --args 127.0.0.1:5901
@@ -464,6 +464,8 @@ After raising it, delete the virt-handler pods to skip the CrashLoopBackOff dela
 | Screen Sharing asks for a password and won't connect | The built-in macOS client requires VNC authentication | Use TigerVNC or RealVNC (§4.5) |
 | VNC window for cirros stays black | CirrOS writes its console to the serial port, not the framebuffer | `virtctl … console cirros` |
 | `fedora` login rejected | cloud-init still running on first boot | Wait about 1 min, then retry. `kubectl logs <launcher> -c guest-console-log` shows cloud-init progress |
+| `vnc --proxy-only` prints `{"port":5901}` and nothing happens | Expected: proxy-only never opens a viewer | Connect a VNC app to `127.0.0.1:5901` within 60 s, or drop `--proxy-only` |
+| Proxy exits with `connection timeout: 1m0s` | No viewer connected within 60 s | Re-run the proxy and connect straight away |
 | `accepts 1 arg(s), received N` | zsh passed an inline `# comment` as arguments | Remove trailing comments, or `setopt interactivecomments` in `~/.zshrc` |
 | Everything slow, Mac swapping | Docker Desktop and Colima both running | Quit Docker Desktop, or lower `COLIMA_MEMORY_GIB` |
 
