@@ -72,13 +72,14 @@ KubeVirt and CDI each follow the **operator + custom resource** pattern:
 1. **The operator app** (wave 0) applies the upstream release manifest: Namespace, CRDs, RBAC and the operator Deployment. It's a kustomize remote resource pinned to a release URL, so bumping the version is a one-line change in Git.
 2. **The CR app** (wave 1) applies a single `KubeVirt` or `CDI` object. The operator reads it and **creates every other component itself**: virt-api, virt-controller, the virt-handler DaemonSet, webhooks, and more CRDs. Argo CD never sees those objects directly.
 
-The CR can't be applied before its CRD exists. Sync waves alone don't enforce this: since Argo CD 1.8, a parent app doesn't wait for a child Application to become healthy. `config/argocd-values.yaml` restores that behaviour with three Lua health checks:
+The CR can't be applied before its CRD exists. Sync waves alone don't enforce this: since Argo CD 1.8, a parent app doesn't wait for a child Application to become healthy. `config/argocd-values.yaml` restores that behaviour with Lua health checks:
 
 | Health check | Healthy when |
 |---|---|
 | `argoproj.io/Application` | The child app reports Healthy, so a wave really waits for the previous one |
 | `kubevirt.io/KubeVirt` | `status.phase == Deployed` |
 | `cdi.kubevirt.io/CDI` | `status.phase == Deployed` |
+| `kubevirt.io/VirtualMachine` | Ready, **or** `runStrategy: Halted` and stopped. Paused counts as Suspended, and error states (`ErrorUnschedulable`, `CrashLoopBackOff`, `DataVolumeError`…) count as Degraded. Without this, Argo CD's built-in check reports the intentionally halted `fedora` as Suspended, and `demo-vms` and `root` never show Healthy |
 
 So wave 2 (the VMs) starts only after KubeVirt reports `Deployed`. That's why a broken virt-handler (§6.1) shows up as *"VMs never appear"*.
 

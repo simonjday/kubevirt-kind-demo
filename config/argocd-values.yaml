@@ -35,3 +35,41 @@ configs:
         hs.message = "Deployed " .. (obj.status.observedVersion or "")
       end
       return hs
+    # Argo CD's built-in VM check reports a Halted VM as Suspended, which rolls up
+    # to demo-vms and root. fedora is Halted by design (Flow 2 starts it), so treat
+    # an intentionally stopped VM as Healthy. Everything else mirrors the VM's status.
+    resource.customizations.health.kubevirt.io_VirtualMachine: |
+      hs = { status = "Progressing", message = "Waiting for VM" }
+      local ps = ""
+      if obj.status ~= nil and obj.status.printableStatus ~= nil then
+        ps = obj.status.printableStatus
+      end
+      if obj.spec ~= nil and obj.spec.runStrategy == "Halted" and (ps == "Stopped" or ps == "") then
+        hs.status = "Healthy"
+        hs.message = "Halted by design (runStrategy: Halted)"
+        return hs
+      end
+      if ps == "Paused" then
+        hs.status = "Suspended"
+        hs.message = "Paused"
+        return hs
+      end
+      local bad = { ErrorUnschedulable = true, ErrImagePull = true, ImagePullBackOff = true,
+                    CrashLoopBackOff = true, ErrorPvcNotFound = true, ErrorDataVolumeNotFound = true,
+                    DataVolumeError = true, ErrorProvisioning = true }
+      if bad[ps] then
+        hs.status = "Degraded"
+        hs.message = ps
+        return hs
+      end
+      if obj.status ~= nil and obj.status.conditions ~= nil then
+        for _, c in ipairs(obj.status.conditions) do
+          if c.type == "Ready" and c.status == "True" then
+            hs.status = "Healthy"
+            hs.message = "Running"
+            return hs
+          end
+        end
+      end
+      if ps ~= "" then hs.message = ps end
+      return hs
